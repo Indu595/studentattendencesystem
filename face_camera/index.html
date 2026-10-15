@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+    <style>
+        body { color: #1f2937; font: 15px "Segoe UI", sans-serif; margin: 0; }
+        button { background: #3559e0; border: 0; border-radius: 8px; color: #fff; cursor: pointer; font: inherit; font-weight: 600; margin: 8px 8px 8px 0; padding: 10px 14px; }
+        button:disabled { cursor: wait; opacity: .6; }
+        video { background: #111827; border-radius: 10px; display: block; max-height: 350px; object-fit: cover; transform: scaleX(-1); width: min(100%, 520px); }
+        #status { line-height: 1.45; min-height: 24px; }
+        #status.error { color: #b42318; }
+    </style>
+</head>
+<body>
+    <button id="start" type="button">Start camera</button>
+    <button id="action" type="button" hidden></button>
+    <button id="stop" type="button" hidden>Stop camera</button>
+    <video id="video" autoplay muted playsinline></video>
+    <p id="status" role="status">Camera is off.</p>
+    <script>
+        (() => {
+            const modelUrl = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model";
+            const video = document.getElementById("video");
+            const startButton = document.getElementById("start");
+            const actionButton = document.getElementById("action");
+            const stopButton = document.getElementById("stop");
+            const status = document.getElementById("status");
+            let mode = "checkin";
+            let stream = null;
+            let modelsLoaded = false;
+            let busy = false;
+            let scanning = false;
+            let scanTimer = null;
+
+            function setStatus(message, isError = false) {
+                status.textContent = message;
+                status.classList.toggle("error", isError);
+            }
+
+            function sendValue(value) {
+                window.parent.postMessage({
+                    isStreamlitMessage: true,
+                    type: "streamlit:setComponentValue",
+                    value,
+                    dataType: "json"
+                }, "*");
+            }
+
+            function sendHeight() {
+                window.parent.postMessage({
+                    isStreamlitMessage: true,
+                    type: "streamlit:setFrameHeight",
+                    height: document.body.scrollHeight
+                }, "*");
+            }
+
+            function uniqueId() {
+                return window.crypto && crypto.randomUUID
+                    ? crypto.randomUUID()
+                    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            }
+
+            async function loadModels() {
+                if (modelsLoaded) return;
+                if (!window.faceapi) throw new Error("Face recognition library did not load. Check the internet connection.");
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(modelUrl)
+                ]);
+                modelsLoaded = true;
+            }
+
+            async function openCamera() {
+                if (busy || stream) return;
+                busy = true;
+                startButton.disabled = true;
+                try {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        throw new Error("Camera access requires HTTPS or localhost.");
+                    }
+                    setStatus("Loading face models…");
+                    await loadModels();
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: "user" },
+                        audio: false
+                    });
+                    video.srcObject = stream;
+                    await video.play();
+                    startButton.hidden = true;
+                    stopButton.hidden = false;
+                    actionButton.hidden = false;
+                    if (mode === "enroll") actionButton.textContent = "Capture three consented photos";
+                    if (mode === "checkin") actionButton.textContent = "Verify face and check in";
+                    if (mode === "scan") actionButton.textContent = "Start scanning";
+                    setStatus(mode === "scan" ? "Camera ready. Start scanning." : "Camera ready. Position your face in view.");
+                    sendHeight();
+                } catch (error) {
+                    setStatus(error.message || "Could not start the camera.", true);
+                    startButton.disabled = false;
+                } finally {
+                    busy = false;
+                }
+            }
+
+            async function detectFaces() {
+                if (!video.videoWidth || !video.videoHeight) throw new Error("Wait until the camera preview is ready.");
+                return faceapi
+                    .detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+                    .withFaceLandmarks()
+                    .withFaceDescriptors();
+            }
+
+            function captureJpeg() {
+                const canvas = document.createElement("canvas");
+                const scale = Math.min(1, 960 / video.videoWidth);
+                canvas.width = Math.round(video.videoWidth * scale);
+                canvas.height = Math.round(video.videoHeight * scale);
+                const context = canvas.getContext("2d");
+                if (!context) throw new Error("Could not capture an image from the camera.");
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const image = canvas.toDataURL("image/jpeg", 0.78);
+                if (image.length > 1450000) throw new Error("Captured image is too large. Move closer to the camera.");
+                return image;
+            }
+
+            async function captureForAction() {
+                if (busy) return;
+                busy = true;
+                actionButton.disabled = true;
+                try {
+                    if (mode === "checkin") {
+                        const detections = await detectFaces();
+                        if (detections.length !== 1) {
+                            throw new Error(detections.length ? "Ensure only one student is in view." : "No face detected. Try better lighting.");
+                        }
+                        sendValue({
+                            event_id: uniqueId(),
+                            event_type: "checkin",
+                            descriptor: Array.from(detections[0].descriptor)
+                        });
+                        setStatus("Face captured. Submitting check-in…");
+                    } else if (mode === "enroll") {
+                        const descriptors = [];
+                        const images = [];
+                        for (let index = 0; index < 3; index += 1) {
+                            const detections = await detectFaces();
+                            if (detections.length !== 1) {
+                                throw new Error(detections.length ? "Ensure only one student is in view." : "No face detected. Try better lighting.");
+                            }
+                            descriptors.push(Array.from(detections[0].descriptor));
+                            images.push(captureJpeg());
+                            if (index < 2) await new Promise((resolve) => setTimeout(resolve, 500));
+                        }
+                        const descriptor = descriptors[0].map((_, index) =>
+                            descriptors.reduce((sum, sample) => sum + sample[index], 0) / descriptors.length
+                        );
+                        sendValue({
+                            event_id: uniqueId(),
+                            event_type: "enroll",
+                            descriptor,
+                            images
+                        });
+                        setStatus("Photos captured. Saving the face profile…");
+                    }
+                } catch (error) {
+                    setStatus(error.message || "Face capture failed.", true);
+                } finally {
+                    busy = false;
+                    actionButton.disabled = false;
+                }
+            }
+
+            async function scanOnce() {
+                if (!scanning || busy) return;
+                busy = true;
+                try {
+                    const detections = await detectFaces();
+                    if (detections.length) {
+                        sendValue({
+                            event_id: uniqueId(),
+                            event_type: "scan",
+                            descriptors: detections.map((item) => Array.from(item.descriptor))
+                        });
+                        setStatus(`Scanning: ${detections.length} face(s) detected.`);
+                    } else {
+                        setStatus("Scanning for enrolled students…");
+                    }
+                } catch (error) {
+                    setStatus(error.message || "Face scan failed.", true);
+                } finally {
+                    busy = false;
+                    if (scanning) scanTimer = setTimeout(scanOnce, 1400);
+                }
+            }
+
+            function startScanning() {
+                if (scanning || !stream) return;
+                scanning = true;
+                actionButton.textContent = "Stop scanning";
+                actionButton.hidden = false;
+                setStatus("Scanning for enrolled students…");
+                scanOnce();
+            }
+
+            function stopCamera() {
+                scanning = false;
+                clearTimeout(scanTimer);
+                if (stream) stream.getTracks().forEach((track) => track.stop());
+                stream = null;
+                video.srcObject = null;
+                startButton.hidden = false;
+                startButton.disabled = false;
+                actionButton.hidden = true;
+                stopButton.hidden = true;
+                setStatus("Camera is off.");
+                sendHeight();
+            }
+
+            startButton.addEventListener("click", openCamera);
+            actionButton.addEventListener("click", () => {
+                if (mode === "scan" && scanning) {
+                    scanning = false;
+                    clearTimeout(scanTimer);
+                    actionButton.textContent = "Start scanning";
+                    setStatus("Scanning stopped.");
+                } else if (mode === "scan") {
+                    startScanning();
+                } else {
+                    captureForAction();
+                }
+            });
+            stopButton.addEventListener("click", stopCamera);
+
+            window.addEventListener("message", (event) => {
+                if (event.data && event.data.type === "streamlit:render") {
+                    const nextMode = event.data.args && event.data.args.mode;
+                    if (nextMode && nextMode !== mode) {
+                        mode = nextMode;
+                        stopCamera();
+                        startButton.textContent = mode === "scan" ? "Start attendance camera" : "Start camera";
+                    }
+                }
+            });
+
+            window.parent.postMessage({
+                isStreamlitMessage: true,
+                type: "streamlit:componentReady",
+                apiVersion: 1
+            }, "*");
+            sendHeight();
+        })();
+    </script>
+</body>
+</html>

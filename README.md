@@ -1,6 +1,6 @@
 # Student Attendance System
 
-A Flask and SQLite attendance app with administrator/faculty accounts, consent-based webcam face enrollment, daily reports, and editable attendance.
+A Flask/Streamlit and SQLite attendance app with administrator/faculty accounts, consent-based webcam face enrollment, daily reports, and editable attendance.
 
 ## Features
 
@@ -21,6 +21,33 @@ A Flask and SQLite attendance app with administrator/faculty accounts, consent-b
 - Delete face photos and recognition profile from a student's enrollment controls.
 
 ## Getting started
+
+### Run with Streamlit
+
+1. Install the dependencies:
+   ```powershell
+   pip install -r requirements.txt
+   ```
+2. Start the Streamlit interface:
+   ```powershell
+   streamlit run streamlit_app.py
+   ```
+3. Create the first administrator account when prompted. The Streamlit interface reuses the same SQLite database and attendance API as the Flask interface.
+
+The Streamlit interface includes the year-of-study overview filter, attendance grouped by academic year/branch/year of study, student history, manual attendance corrections, faculty and student management, face enrollment, automatic face attendance, and student self check-in. Camera use requires HTTPS (provided by Streamlit Community Cloud) and an internet connection to load the face-recognition models.
+
+### Deploy on Streamlit Community Cloud
+
+1. Push this project to a GitHub repository and open [share.streamlit.io](https://share.streamlit.io/).
+2. Choose **Create app**, select the repository and branch, and set the main file path to `streamlit_app.py`.
+3. In the app's **Settings → Secrets**, set `APP_SECRET_KEY` to a long, private random value.
+4. Deploy and complete the first administrator setup in the app.
+
+**Important data-storage limitation:** Streamlit Community Cloud's local filesystem is not persistent across app restarts or redeployments. This app currently uses SQLite, including for face descriptors and face photos. Do not use Community Cloud for real attendance or biometric data until the database has been migrated to a persistent, access-controlled database. Do not commit any live database, student data, face images, passwords, or secrets to GitHub. Existing tracked database files must be removed from the repository history before using it for real data.
+
+To configure a local or self-hosted SQLite location, set `ATTENDANCE_DATABASE` to the database file path in the process environment or Streamlit secrets.
+
+### Run with Flask
 
 1. Open a terminal in the project root.
 2. Create a virtual environment if needed:
@@ -61,6 +88,8 @@ Recognition may make mistakes and does not detect spoofing. Review the daily rep
 ## Project structure
 
 - `app.py` — Flask routes, authentication, SQLite persistence, reports
+- `streamlit_app.py` — Streamlit interface, reusing the Flask API and SQLite database
+- `face_camera/index.html` — Streamlit webcam/face-recognition component
 - `templates/index.html` — login and attendance dashboard
 - `static/app.js` — dashboard, webcam recognition, enrollment
 - `static/style.css` — responsive UI styling
