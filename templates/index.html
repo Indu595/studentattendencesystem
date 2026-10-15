@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Student Attendance System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+    <main class="container">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Academic Management</p>
+                <h1>Student Attendance System</h1>
+            </div>
+            <div class="topbar-actions">
+                <div id="homeActions" class="home-actions">
+                    <button id="openStaffBtn" class="secondary-btn" type="button">Staff Login</button>
+                </div>
+                <div id="userBar" class="user-bar" hidden>
+                    <span id="currentUserLabel"></span>
+                    <button id="returnDashboardBtn" class="secondary-btn" type="button" hidden>Staff Dashboard</button>
+                    <button id="logoutBtn" class="secondary-btn" type="button">Log out</button>
+                </div>
+            </div>
+        </header>
+
+        <section id="authPanel" class="panel auth-panel" hidden>
+            <h2 id="authTitle">Staff login</h2>
+            <p id="authHelp" class="privacy-note"></p>
+            <form id="authForm">
+                <label for="authUsername">Username</label>
+                <input id="authUsername" name="username" autocomplete="username" required minlength="3" maxlength="80" />
+                <label for="authPassword">Password</label>
+                <input id="authPassword" name="password" type="password" autocomplete="current-password" required />
+                <button id="authSubmitBtn" class="primary-btn" type="submit">Log in</button>
+            </form>
+            <p id="authMessage" class="form-message" role="status"></p>
+            <button id="backFromStaffBtn" class="secondary-btn back-btn" type="button">Back to home</button>
+        </section>
+
+        <section id="studentPortal" class="panel student-portal" hidden>
+            <h2>Student Attendance Check-in</h2>
+            <p class="privacy-note">Enter your roll number and verify your face with the webcam. Student self check-in is available daily from 9:00 AM to 11:00 AM (school server local time). Your face must be enrolled by staff with student or guardian consent. Enrollment photos and a face template are stored in the school's attendance database; the live scan is compared with the profile for your roll number. Only a successful match can mark attendance.</p>
+            <div class="student-checkin-grid">
+                <div class="camera-preview">
+                    <video id="studentCameraVideo" autoplay muted playsinline></video>
+                    <p id="studentCameraStatus" class="camera-status" role="status">Camera is off.</p>
+                </div>
+                <form id="studentCheckinForm" class="checkin-form">
+                    <label for="studentRollInput">Student roll number</label>
+                    <input id="studentRollInput" name="roll_number" type="text" minlength="2" maxlength="40" autocomplete="off" required />
+                    <button id="studentCheckinBtn" class="primary-btn" type="submit">Verify Face &amp; Mark Attendance</button>
+                    <p class="camera-help">Allow camera access when prompted. Face matching needs an internet connection to load the recognition model. If your face is not recognized, contact faculty for help.</p>
+                    <p id="studentCheckinMessage" class="form-message" role="status"></p>
+                </form>
+            </div>
+        </section>
+
+        <div id="dashboard" hidden>
+            <div class="dashboard-heading">
+                <div class="dashboard-title">
+                    <p id="roleNotice" class="privacy-note"></p>
+                    <button id="backToHomeBtn" class="secondary-btn back-btn" type="button">Back to Home</button>
+                </div>
+                <div class="date-picker-wrap">
+                    <label for="attendanceDate">Attendance / report date</label>
+                    <input id="attendanceDate" type="date" />
+                </div>
+            </div>
+            <nav class="dashboard-navigation" aria-label="Staff dashboard sections">
+                <button id="overviewTabBtn" class="secondary-btn active" type="button" aria-pressed="true">Overview</button>
+                <button id="managementTabBtn" class="secondary-btn" type="button" aria-pressed="false">Manage Students &amp; Attendance</button>
+            </nav>
+            <section id="staffOverview">
+                <div class="overview-filter field">
+                    <label for="overviewStudyYear">Year of study</label>
+                    <select id="overviewStudyYear">
+                        <option value="">All years of study</option>
+                    </select>
+                </div>
+                <section class="summary-grid overview-summary">
+                    <article class="stat-card overall">
+                        <span class="label">Total students</span>
+                        <strong id="overviewTotalCount">0</strong>
+                    </article>
+                    <article class="stat-card present">
+                        <span class="label">Present today</span>
+                        <strong id="overviewPresentCount">0</strong>
+                    </article>
+                    <article class="stat-card absent">
+                        <span class="label">Absent today</span>
+                        <strong id="overviewAbsentCount">0</strong>
+                    </article>
+                </section>
+                <section class="panel table-panel overview-panel">
+                    <div class="table-header">
+                        <div>
+                            <h2>Attendance by Academic Year &amp; Branch</h2>
+                            <p id="overviewMeta" class="privacy-note"></p>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead>
+                                <tr><th>Academic year</th><th>Branch</th><th>Year of study</th><th>Present</th><th>Absent</th><th>Excused</th><th>Unmarked</th><th>Total</th></tr>
+                            </thead>
+                            <tbody id="overviewTableBody"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </section>
+            <section id="managementPanel" hidden>
+            <div class="report-filters">
+                <div class="field">
+                    <label for="reportAcademicYear">Academic year</label>
+                    <select id="reportAcademicYear"></select>
+                </div>
+                <div class="field">
+                    <label for="reportBranch">Branch / department</label>
+                    <select id="reportBranch"></select>
+                </div>
+            </div>
+
+            <section id="facultyPanel" class="panel form-panel" hidden>
+                <h2>Create faculty login</h2>
+                <form id="facultyForm">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="facultyUsername">Faculty username</label>
+                            <input id="facultyUsername" name="username" autocomplete="off" minlength="3" maxlength="80" required />
+                        </div>
+                        <div class="field">
+                            <label for="facultyPassword">Temporary password (12+ characters)</label>
+                            <input id="facultyPassword" name="password" type="password" autocomplete="new-password" minlength="12" required />
+                        </div>
+                    </div>
+                    <button type="submit" class="primary-btn">Create faculty account</button>
+                </form>
+                <div class="table-wrap compact-table">
+                    <table>
+                        <thead><tr><th>Username</th><th>Role</th><th>Created</th></tr></thead>
+                        <tbody id="facultyTableBody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel form-panel">
+                <h2>Register a Student</h2>
+                <form id="studentForm">
+                    <div class="form-grid">
+                        <div class="field">
+                            <label for="studentName">Full Name</label>
+                            <input id="studentName" name="name" type="text" placeholder="e.g. Nomsa Dlamini" required />
+                        </div>
+                        <div class="field">
+                            <label for="rollNumber">Roll Number</label>
+                            <input id="rollNumber" name="roll_number" type="text" placeholder="STD-107" required />
+                        </div>
+                        <div class="field">
+                            <label for="studyYear">Year of study</label>
+                            <input id="studyYear" name="study_year" type="text" placeholder="Year 1" maxlength="50" required />
+                        </div>
+                        <div class="field">
+                            <label for="semester">Semester</label>
+                            <input id="semester" name="semester" type="text" placeholder="Semester 1" maxlength="50" required />
+                        </div>
+                        <div class="field">
+                            <label for="studentBranch">Branch / department</label>
+                            <input id="studentBranch" name="branch" type="text" placeholder="Computer Science" maxlength="100" required />
+                        </div>
+                        <div class="field">
+                            <label for="studentAcademicYear">Academic year</label>
+                            <input id="studentAcademicYear" name="academic_year" type="text" placeholder="2026-2027" pattern="[0-9]{4}-[0-9]{4}" required />
+                        </div>
+                        <div class="field">
+                            <label for="phoneNumber">Phone Number</label>
+                            <input id="phoneNumber" name="phone" type="text" placeholder="+1234567890" />
+                        </div>
+                    </div>
+                    <button type="submit" class="primary-btn">Register Student</button>
+                </form>
+                <div class="enrollment-section">
+                    <h3>Student Face Enrollment</h3>
+                    <p class="camera-help">Register the student first, then select them here. Face enrollment requires student or guardian consent.</p>
+                    <div class="enrollment-grid">
+                        <div class="camera-preview">
+                            <video id="enrollmentVideo" autoplay muted playsinline></video>
+                            <p id="enrollmentStatus" class="camera-status" role="status">Enrollment camera is off.</p>
+                        </div>
+                        <div class="camera-controls">
+                            <label for="enrollStudent">Student to enroll</label>
+                            <select id="enrollStudent">
+                                <option value="">Choose a student</option>
+                            </select>
+                            <label class="consent-label">
+                                <input id="faceConsent" type="checkbox" />
+                                I confirm student or guardian consent to capture and store three face photos for attendance.
+                            </label>
+                            <div class="camera-actions">
+                                <button id="startEnrollmentCameraBtn" class="secondary-btn" type="button">Start Enrollment Camera</button>
+                                <button id="enrollFaceBtn" class="primary-btn" type="button" disabled>Capture &amp; Enroll Face</button>
+                                <button id="removeFaceBtn" class="secondary-btn" type="button" disabled>Delete Face Data</button>
+                                <button id="stopEnrollmentCameraBtn" class="secondary-btn" type="button" disabled>Stop Camera</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel camera-panel">
+                <div class="camera-heading">
+                    <div>
+                        <h2>Webcam Attendance</h2>
+                        <p class="privacy-note">Start the attendance camera to detect all visible faces. Every uniquely matched, enrolled student in the frame will be marked present. Recognition templates are stored in the school's SQLite database. Check the report and correct mistakes manually.</p>
+                    </div>
+                </div>
+                <div class="camera-grid">
+                    <div class="camera-preview">
+                        <video id="cameraVideo" autoplay muted playsinline></video>
+                        <p id="cameraStatus" class="camera-status" role="status">Camera is off.</p>
+                    </div>
+                    <div class="camera-controls">
+                        <button id="startCameraBtn" class="primary-btn" type="button">Start Camera</button>
+                        <button id="stopCameraBtn" class="secondary-btn" type="button" disabled>Stop Camera</button>
+                        <button id="autoScanBtn" class="primary-btn" type="button" disabled>Start Automatic Attendance</button>
+                        <p class="camera-help">Recognition models load from jsDelivr and need internet access. For camera access, use localhost or HTTPS. Each uniquely recognized student is marked at most once for the selected date; ambiguous or unrecognized faces are not marked. Check the daily register and manually correct mistakes.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="summary-grid">
+                <article class="stat-card present"><span class="label">Present</span><strong id="presentCount">0</strong></article>
+                <article class="stat-card late"><span class="label">Late</span><strong id="lateCount">0</strong></article>
+                <article class="stat-card excused"><span class="label">Excused</span><strong id="excusedCount">0</strong></article>
+                <article class="stat-card absent"><span class="label">Absent</span><strong id="absentCount">0</strong></article>
+                <article class="stat-card overall"><span class="label">Attendance</span><strong id="attendancePercentage">0%</strong></article>
+                <article class="stat-card"><span class="label">Unmarked</span><strong id="unmarkedCount">0</strong></article>
+            </section>
+
+            <section class="panel table-panel">
+                <div class="table-header">
+                    <div>
+                        <h2>Daily Attendance Report</h2>
+                        <p id="reportMeta" class="privacy-note"></p>
+                    </div>
+                    <button id="saveAttendanceBtn" class="primary-btn" type="button">Save Manual Corrections</button>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Name</th><th>Roll No.</th><th>Academic year</th><th>Branch</th><th>Year of study</th><th>Semester</th><th>Status</th><th>Notes / correction</th><th>Recorded by</th></tr>
+                        </thead>
+                        <tbody id="attendanceTableBody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel history-panel">
+                <h2>Student Attendance History</h2>
+                <div class="history-controls">
+                    <label for="historyStudent">Student</label>
+                    <select id="historyStudent"><option value="">Choose a student</option></select>
+                    <button id="loadHistoryBtn" class="secondary-btn" type="button">View History</button>
+                </div>
+                <p id="historySummary" class="privacy-note"></p>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Date</th><th>Academic year</th><th>Branch</th><th>Status</th><th>Notes</th><th>Source</th><th>Last updated</th></tr></thead>
+                        <tbody id="historyTableBody"></tbody>
+                    </table>
+                </div>
+            </section>
+            </section>
+        </div>
+        <p id="appMessage" class="toast" role="status" hidden></p>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
