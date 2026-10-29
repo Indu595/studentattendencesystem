@@ -29,7 +29,7 @@ ATTENDANCE_STATUSES = {"present", "absent", "late", "excused"}
 FACE_DESCRIPTOR_SIZE = 128
 MAX_FACE_IMAGE_BYTES = 1024 * 1024
 FACE_MATCH_THRESHOLD = 0.43
-ROLL_NUMBER_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{1,39}$")
+ROLL_NUMBER_PATTERN = re.compile(r"^RQ\d+$")
 ACADEMIC_YEAR_PATTERN = re.compile(r"^(\d{4})-(\d{4})$")
 
 
