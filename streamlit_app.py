@@ -239,7 +239,7 @@ def render_faculty_management() -> None:
     st.subheader("Faculty accounts")
     with st.form("create_faculty"):
         username = st.text_input("Faculty username", max_chars=80)
-        password = st.text_input("Temporary password (12+ characters)", type="password", min_chars=12)
+        password = st.text_input("Temporary password (12+ characters)", type="password")
         submitted = st.form_submit_button("Create faculty account", type="primary")
     if submitted:
         try:
