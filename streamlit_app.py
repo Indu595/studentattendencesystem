@@ -138,7 +138,7 @@ def render_auth() -> bool:
         st.info("Create the first administrator account. Use a unique password of at least 12 characters.")
         with st.form("admin_setup"):
             username = st.text_input("Administrator username", max_chars=80)
-            password = st.text_input("Password", type="password", min_chars=12)
+            password = st.text_input("Password", type="password")
             submitted = st.form_submit_button("Create administrator", type="primary")
         if submitted:
             try:
